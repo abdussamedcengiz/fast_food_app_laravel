@@ -1,64 +1,178 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Fast Food App — API
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sipariş uygulamasının REST API'si. Menü, kategoriler, özelleştirmeler ve
+Sanctum token ile kullanıcı kimliği.
 
-## About Laravel
+**Mobil istemci:** [fast_food_app](https://github.com/abdussamedcengiz/fast_food_app)
+(React Native + Expo)
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Teknolojiler
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- Laravel 8 + PHP 8
+- Laravel Sanctum (API token kimlik doğrulama)
+- Eloquent ORM, MySQL veya SQLite
+- PHPUnit (14 test)
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Kurulum
 
-## Learning Laravel
+```bash
+composer install
+cp .env.example .env        # Windows: copy .env.example .env
+php artisan key:generate
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+`.env` içinde veritabanını seç. En hızlısı SQLite:
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```env
+DB_CONNECTION=sqlite
+# DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD satırlarını yorum yap
+```
 
-## Laravel Sponsors
+```bash
+touch database/database.sqlite   # Windows: type nul > database\database.sqlite
+php artisan migrate --seed
+php artisan serve
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+API `http://127.0.0.1:8000` adresinde çalışır.
+Kontrol: <http://127.0.0.1:8000/api/categories>
 
-### Premium Partners
+## API
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+Tüm uçlar `/api` önekiyle. Korumalı olanlar `Authorization: Bearer <token>` ister.
 
-## Contributing
+| Metot | Adres | Açıklama | Auth |
+|---|---|---|---|
+| POST | `/api/sign-up` | Kayıt ol, token döner (`201`) | – |
+| POST | `/api/sign-in` | Giriş yap, token döner | – |
+| POST | `/api/sign-out` | Token'ı iptal eder | ✔ |
+| GET | `/api/user` | Oturumdaki kullanıcı | ✔ |
+| GET | `/api/categories` | Kategoriler | – |
+| GET | `/api/customizations` | Özelleştirmeler | – |
+| GET | `/api/menu-items` | Menü — `?search=` ve `?category=` destekler | – |
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### Menü filtreleri
 
-## Code of Conduct
+```bash
+# Ada veya açıklamaya göre ara
+curl "http://127.0.0.1:8000/api/menu-items?search=pizza"
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# Kategoriye göre filtrele
+curl "http://127.0.0.1:8000/api/menu-items?category=1"
 
-## Security Vulnerabilities
+# İkisi birlikte + kayıt sınırı
+curl "http://127.0.0.1:8000/api/menu-items?search=burger&category=1&limit=20"
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Doğrulama kuralları
 
-## License
+| Alan | Kural |
+|---|---|
+| `name` | Zorunlu, en fazla 255 karakter |
+| `email` | Geçerli e-posta; kırpılır ve **küçük harfe çevrilir** |
+| `password` | Kayıtta en az 8 karakter |
+| `search` | En fazla 100 karakter |
+| `category` | Var olan bir kategori kimliği olmalı |
+| `limit` | 1–100 |
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Girişte şifre uzunluğu **kontrol edilmez**: kayıt kuralı sonradan 6'dan
+8'e çıkarıldı ve eski kullanıcılar hesaplarına girebilmeli.
+
+### Hata biçimi
+
+Laravel standardı:
+
+```json
+{ "message": "The given data was invalid.", "errors": { "password": ["..."] } }
+```
+
+| Kod | Ne zaman |
+|---|---|
+| `401` | Token yok, geçersiz veya iptal edilmiş |
+| `422` | Doğrulama hatası; yanlış e-posta/şifre |
+| `429` | Hız sınırı aşıldı (kimlik uçlarında 6 istek/dk) |
+
+## Güvenlik
+
+- **Şifreler** bcrypt ile hash'lenir; `User` modelindeki `$hidden`
+  sayesinde hiçbir cevapta yer almaz.
+- **Kullanıcı sayımına karşı**, e-posta bulunamadığında da sahte bir
+  hash ile karşılaştırma yapılır; cevap süresi her iki durumda aynıdır.
+  Hata mesajı da birebir aynıdır.
+- **E-posta normalizasyonu** doğrulamadan önce yapılır; böylece
+  `unique:users` kuralı da normalize edilmiş değer üzerinden çalışır ve
+  aynı adres iki farklı yazımla kaydedilemez.
+- **Hız sınırı**: kimlik uçlarında 6 istek/dk (Laravel'in kendi giriş
+  ekranlarında kullandığı sınır). Diğer uçlarda varsayılan 60/dk.
+- **Çıkış** token'ı gerçekten siler. Sanctum token'ları varsayılan
+  olarak süresizdir; çıkış ucu olmadan bir kez üretilen token sonsuza
+  kadar geçerli kalırdı.
+- **LIKE kaçışı**: aramada `%` ve `_` joker karakterleri kaçırılır,
+  böylece kullanıcının yazdığı metin düz metin olarak aranır.
+
+## Testler
+
+```bash
+./vendor/bin/phpunit
+```
+
+14 test, gerçek sorgularla çalışır (bellekte SQLite):
+
+| Dosya | Kapsam |
+|---|---|
+| `tests/Feature/AuthTest.php` | Kayıt, şifre kuralı, e-posta normalizasyonu, tekrar kayıt, aynı hata mesajı, token iptali |
+| `tests/Feature/MenuTest.php` | Menü listesi, arama, açıklamada arama, kategori filtresi, geçersiz kategori, ilişkiler |
+
+Testler `phpunit.xml` içinde tanımlı **bellekteki** SQLite'ı kullanır.
+Bu satırlar önceden yorum halindeydi; testler gerçek geliştirme
+veritabanına bağlanıp `RefreshDatabase` ile onu silerdi.
+
+## Proje yapısı
+
+```
+app/
+├── Http/Controllers/
+│   ├── AuthController.php    # Kayıt, giriş, çıkış
+│   └── MenuController.php    # Menü, arama, filtre
+└── Models/                   # User, Category, MenuItem, Customization
+database/
+├── migrations/
+└── seeders/DummyDataSeeder.php
+routes/api.php
+tests/Feature/
+```
+
+## Bilinen eksikler
+
+- **Sipariş yok.** Sepet yalnızca mobil tarafta tutuluyor; sipariş
+  oluşturma ucu henüz yazılmadı.
+- **Yetkilendirme yok.** Roller yok; menüyü değiştirecek bir yönetim
+  ucu da yok (menü yalnızca seeder ile doluyor).
+
+### ⚠️ Bağımlılıklarda bilinen güvenlik açıkları
+
+Laravel 8'in güvenlik desteği **Ocak 2023'te bitti**. Bunun somut sonucu
+ölçülebilir durumda:
+
+```bash
+composer audit
+# Found 37 security vulnerability advisories affecting 11 packages.
+```
+
+Ayrıca modern Composer bu bağımlılık ağacını artık **çözemiyor bile**:
+`composer update` çalıştırıldığında paketler güvenlik danışmanları
+nedeniyle engelleniyor. Yani bağımlılıklar bugün olduğu gibi donmuş
+durumda.
+
+Ek olarak iki paket terk edilmiş:
+- `fruitcake/laravel-cors` — Laravel 9'dan beri çekirdeğin parçası
+- `facade/ignition` — yerini `spatie/laravel-ignition` aldı
+
+**Bu bir yükseltme işidir**, düzeltme değil: Laravel 8 → 12 dört ana
+sürüm demek ve `app/Http/Kernel.php` / `app/Exceptions/Handler.php`
+gibi dosyaların tamamen kalktığı yeni iskelet yapısına geçmeyi
+gerektirir. Bilinçli bir karar ve ayrı bir çalışma olarak planlanmalı.
+
+## Lisans
+
+MIT — ayrıntılar için [LICENSE](LICENSE) dosyasına bak.
