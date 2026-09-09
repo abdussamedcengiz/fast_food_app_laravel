@@ -48,14 +48,35 @@ class MenuController extends Controller
             // LIKE içinde % ve _ joker karakterlerdir. Kullanıcı "50%"
             // ararsa bunu joker değil düz metin olarak aramalıyız,
             // yoksa arama beklenmedik sonuçlar döner.
-            $escaped = addcslashes($search, '%_');
+            //
+            // KAÇIŞ KARAKTERİ NEDEN "!" ve NEDEN ESCAPE CÜMLESİ ŞART?
+            //
+            // Kaçırmanın işe yaraması için LIKE'a kaçış karakterinin
+            // ne olduğunun SÖYLENMESİ gerekir. MySQL ESCAPE cümlesi
+            // yoksa varsayılan olarak ters eğik çizgiyi kabul eder,
+            // SQLite ise HİÇBİR varsayılan tanımaz. Bu proje testlerde
+            // ve yerel geliştirmede SQLite kullandığı için, ESCAPE
+            // yazılmadığında "50%" aramasi hiçbir sonuç dönmüyordu.
+            //
+            // Ters eğik çizgi de kullanılamaz: MySQL onu metin
+            // sabitlerinin içinde kendisi de kaçış karakteri saydığı
+            // için ESCAPE '' iki motorda farklı okunur. "!" ise her
+            // iki motorda da sıradan bir karakter, tek yazımla ikisinde
+            // de doğru çalışıyor.
+            //
+            // Önce "!" ikileniyor: kullanıcı gerçekten "!" ararsa bu
+            // karakterin kaçış işareti sanılmasını engelliyor.
+            $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $search);
 
             // Gruplama şart: parantezsiz yazılsaydı orWhere, dışarıdaki
             // kategori koşulunu da geçersiz kılardı
             // (A AND B OR C yerine A AND (B OR C) istiyoruz).
+            //
+            // ESCAPE değeri sabit bir harf; kullanıcı girdisi yalnızca
+            // bağlanan parametrede (?) taşınıyor.
             $q->where(function ($sub) use ($escaped) {
-                $sub->where('name', 'like', '%' . $escaped . '%')
-                    ->orWhere('description', 'like', '%' . $escaped . '%');
+                $sub->whereRaw("name LIKE ? ESCAPE '!'", ['%' . $escaped . '%'])
+                    ->orWhereRaw("description LIKE ? ESCAPE '!'", ['%' . $escaped . '%']);
             });
         });
 

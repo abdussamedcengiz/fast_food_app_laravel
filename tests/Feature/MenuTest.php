@@ -110,4 +110,92 @@ class MenuTest extends TestCase
         $this->getJson('/api/categories')->assertStatus(200)->assertJsonCount(2);
         $this->getJson('/api/customizations')->assertStatus(200);
     }
+
+    /** Adı verilen tek bir menü ürünü oluşturur. */
+    private function urunEkle(string $ad): void
+    {
+        $kategori = Category::firstOrCreate(
+            ['name' => 'Test'],
+            ['description' => 'Test kategorisi']
+        );
+
+        MenuItem::create([
+            'name' => $ad,
+            'description' => 'aciklama',
+            'image_url' => 'https://ornek.test/urun.png',
+            'price' => 10,
+            'rating' => 4,
+            'calories' => 100,
+            'protein' => 5,
+            'category_id' => $kategori->id,
+        ]);
+    }
+
+    /**
+     * REGRESYON: "%" düz metin olarak aranmalı.
+     *
+     * Arama LIKE ile yapılıyor ve "%" LIKE içinde jokerdir. Kaçırma
+     * yapılıyordu ama sorguda ESCAPE cümlesi yoktu; SQLite hiçbir
+     * varsayılan kaçış karakteri tanımadığı için "50%" araması
+     * hiçbir sonuç dönmüyordu.
+     */
+    public function test_yuzde_isareti_duz_metin_olarak_aranir(): void
+    {
+        $this->urunEkle('50% Indirimli Menu');
+        $this->urunEkle('Normal Burger');
+
+        $adlar = array_column(
+            $this->getJson('/api/menu-items?search=' . urlencode('50%'))
+                ->assertStatus(200)
+                ->json(),
+            'name'
+        );
+
+        $this->assertContains('50% Indirimli Menu', $adlar);
+        $this->assertNotContains('Normal Burger', $adlar);
+    }
+
+    /**
+     * REGRESYON: "_" de jokerdir (tek karakter eşler).
+     *
+     * Kaçırma çalışmazsa "Combo_1" araması "ComboX1" kaydını da
+     * getirir; ESCAPE eksikken ise hiçbir şey getirmiyordu.
+     */
+    public function test_alt_cizgi_joker_gibi_davranmaz(): void
+    {
+        $this->urunEkle('Combo_1');
+        $this->urunEkle('ComboX1');
+
+        $adlar = array_column(
+            $this->getJson('/api/menu-items?search=' . urlencode('Combo_1'))
+                ->assertStatus(200)
+                ->json(),
+            'name'
+        );
+
+        $this->assertContains('Combo_1', $adlar);
+        $this->assertNotContains('ComboX1', $adlar);
+    }
+
+    /**
+     * REGRESYON: kaçış karakterinin kendisi de aranabilmeli.
+     *
+     * "!" kaçış karakteri olarak seçildiği için, kullanıcı gerçekten
+     * "!" ararsa bunun joker işareti sanılmaması gerekiyor.
+     */
+    public function test_unlem_isareti_aranabilir(): void
+    {
+        $this->urunEkle('Acili Burger!');
+        $this->urunEkle('Sade Burger');
+
+        $adlar = array_column(
+            $this->getJson('/api/menu-items?search=' . urlencode('Burger!'))
+                ->assertStatus(200)
+                ->json(),
+            'name'
+        );
+
+        $this->assertContains('Acili Burger!', $adlar);
+        $this->assertNotContains('Sade Burger', $adlar);
+    }
 }
